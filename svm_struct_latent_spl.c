@@ -898,7 +898,7 @@ int main(int argc, char* argv[]) {
   // skip testing for the moment  
   
   // write objective function value to file	
-  FILE *objfl = fopen(objfile, "a");
+  FILE *objfl = fopen(objfile, "w");
   if (objfl==NULL) {
     printf("Cannot open model file %s for output!", objfile);
     exit(1);
