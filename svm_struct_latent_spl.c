@@ -43,7 +43,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *init_modelfile, 
+void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
 						double *init_spl_weight, double *spl_factor);
 
@@ -693,6 +693,7 @@ int main(int argc, char* argv[]) {
   char trainfile[1024];
   char modelfile[1024];
   char init_modelfile[1024];
+  char objfile[1024];
   int MAX_ITER;
   /* new struct variables */
   //SVECTOR **fycache, *diff, *fy;
@@ -716,7 +717,7 @@ int main(int argc, char* argv[]) {
  
 
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, &learn_parm, &kernel_parm, &sparm, 
+	my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, objfile, &learn_parm, &kernel_parm, &sparm, 
 													&init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
@@ -895,6 +896,15 @@ int main(int argc, char* argv[]) {
   /* write structural model */
   write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
+  
+  // write objective function value to file	
+  FILE *objfl = fopen(objfile, "a");
+  if (objfl==NULL) {
+    printf("Cannot open model file %s for output!", objfile);
+    exit(1);
+  }
+  fprintf(objfl, "%0.7f\n", last_primal_obj);
+  fclose(objfl);
 
   /* free memory */
   free_struct_sample(alldata);
@@ -916,7 +926,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *init_modelfile, 
+void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,
 						double *init_spl_weight, double *spl_factor) 
 {
@@ -976,9 +986,10 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		strcpy (modelfile, "lssvm.model");
 	}
 
-   if((i+2)<argc) {
+    strcpy (objfile, argv[i+2]);
+   if((i+3)<argc) {
       struct_parm->isInitByBinSVM = 1;
-      strcpy (init_modelfile, argv[i+2]);
+      strcpy (init_modelfile, argv[i+3]);
     }
     else{
       struct_parm->isInitByBinSVM = 0;
