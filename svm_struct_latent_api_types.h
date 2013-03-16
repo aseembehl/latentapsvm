@@ -40,6 +40,7 @@ typedef struct sub_pattern {
   SVECTOR **phis;
   int n_candidates;
   int label;
+  int supervised_positive;
   
 } SUB_PATTERN;
 
