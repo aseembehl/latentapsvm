@@ -76,7 +76,7 @@ SVECTOR *read_sparse_vector(char *file_name, int object_id, STRUCT_LEARN_PARM *s
 	return fvec;
 }
 
-SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
+SAMPLE read_unpooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 
   //Read input examples {(x_1,y_1),...,(x_n,y_n)} from file.
   //The type of pattern x and label y has to follow the definition in 
@@ -236,6 +236,235 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
     return(sample); 
 }
 
+SAMPLE read_pooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
+/*
+  Read input examples {(x_1,y_1),...,(x_n,y_n)} from file.
+  The type of pattern x and label y has to follow the definition in 
+  svm_struct_latent_api_types.h. Latent variables h can be either
+  initialized in this function or by calling init_latent_variables(). 
+*/
+  SAMPLE sample;
+  
+  /* your code here */
+    int i , j; 
+    
+    // open the file containing candidate bounding box dimensions/labels/featurePath and image label
+    FILE *fp = fopen(file, "r");
+    if(fp==NULL){
+        printf("Error: Cannot open input file %s\n",file);
+        exit(1);      
+    }
+
+    // We treat all images as one example, since there is only one correct structural output Y* for all images combined
+    sample.n = 1;  
+    sample.allExamples = (EXAMPLE *) malloc(sample.n*sizeof(EXAMPLE));
+    if(!sample.allExamples) die("Memory error.");
+    
+    sample.allExamples[0].n_pos = 0;
+    sample.allExamples[0].n_neg = 0;
+    
+    fscanf(fp,"%ld", &sample.allExamples[0].n_imgs);
+
+    /* Initialise pattern */
+    sample.allExamples[0].x.example_cost = 1;
+    sample.allExamples[0].x.x_is = (SUB_PATTERN *) malloc(sample.allExamples[0].n_imgs*sizeof(SUB_PATTERN));
+    if(!sample.allExamples[0].x.x_is) die("Memory error.");
+    sample.allExamples[0].y.labels = (int *) malloc(sample.allExamples[0].n_imgs*sizeof(int));
+    if(!sample.allExamples[0].y.labels) die("Memory error.");
+    
+    
+  
+    int min_x;
+	int min_y;
+	int width;
+	int height;
+	int id_map;
+	int n_candidates;
+	char file_name[1000];
+	int bbox_label;
+	int n_sup_pos;
+    
+    for(i = 0; i < sample.allExamples[0].n_imgs; i++){      
+        sample.allExamples[0].x.x_is[i].supervised_positive = 0;
+        n_sup_pos = 0;
+      
+        fscanf(fp, "%s", file_name);
+        fscanf(fp, "%d", &n_candidates);
+        
+        sample.allExamples[0].x.x_is[i].boxes = (BBOX *) malloc(n_candidates*sizeof(BBOX));
+        if(!sample.allExamples[0].x.x_is[i].boxes) die("Memory error.");
+	    sample.allExamples[0].x.x_is[i].id_map = (int *) malloc(n_candidates*sizeof(int));
+        if(!sample.allExamples[0].x.x_is[i].id_map) die("Memory error.");
+        sample.allExamples[0].x.x_is[i].bbox_labels = (int *) malloc (n_candidates*sizeof(int));
+        if(!sample.allExamples[0].x.x_is[i].bbox_labels) die("Memory error.");
+        sample.allExamples[0].x.x_is[i].phis = (SVECTOR **) malloc(n_candidates*sizeof(SVECTOR *));
+        if(!sample.allExamples[0].x.x_is[i].phis) die("Memory error.");
+        
+        for(j = 0; j < n_candidates; j++){
+	        fscanf(fp, "%d", &min_x);
+            fscanf(fp, "%d", &min_y);
+            fscanf(fp, "%d", &width);
+	        fscanf(fp, "%d", &height);
+	        fscanf(fp, "%d", &id_map);
+	        // bbox label can be -1 or 0. For negative images all bbbox labels are 0(meaning negative). 
+	        // For positive images all bbox labels are -1(meaning unknown). 
+	        fscanf(fp, "%d", &bbox_label);
+	        if(bbox_label == 1){	            
+	            if(n_sup_pos >= 1){
+	                // realloc size of sample.allExamples[0].x.x_is and sample.allExamples[0].y.labels by +n_sup_pos 
+	                sample.allExamples[0].n_imgs++;
+	                sample.allExamples[0].x.x_is = (SUB_PATTERN *) realloc(sample.allExamples[0].x.x_is, sample.allExamples[0].n_imgs*sizeof(SUB_PATTERN));
+                    if(!sample.allExamples[0].x.x_is) die("Memory error.");
+                    sample.allExamples[0].y.labels = (int *) realloc(sample.allExamples[0].y.labels, sample.allExamples[0].n_imgs*sizeof(int));
+                    if(!sample.allExamples[0].y.labels) die("Memory error.");
+	            }	
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].n_candidates = 1;
+	            strcpy(sample.allExamples[0].x.x_is[i+n_sup_pos].file_name, file_name);
+
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].boxes = (BBOX *) realloc(sample.allExamples[0].x.x_is[i+n_sup_pos].boxes, sizeof(BBOX));  
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].boxes[0].min_x = min_x;
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].boxes[0].min_y = min_y;
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].boxes[0].height = height;
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].boxes[0].width = width;
+	            
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].id_map = (int *) realloc(sample.allExamples[0].x.x_is[i+n_sup_pos].id_map, sizeof(int));
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].id_map[0] = id_map;
+
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].bbox_labels = (int *) realloc (sample.allExamples[0].x.x_is[i+n_sup_pos].bbox_labels, sizeof(int));
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].bbox_labels[0] = bbox_label;   	                  
+	            
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].phis = (SVECTOR **) realloc(sample.allExamples[0].x.x_is[i+n_sup_pos].phis, sizeof(SVECTOR *));
+	            sample.allExamples[0].x.x_is[i+n_sup_pos].phis[0] = read_sparse_vector(sample.allExamples[0].x.x_is[i].file_name, sample.allExamples[0].x.x_is[i+n_sup_pos].id_map[0], sparm);
+	            n_sup_pos++;
+	            sample.allExamples[0].x.x_is[i].supervised_positive = 1;
+	            continue;            
+	        }
+	        if(!sample.allExamples[0].x.x_is[i].supervised_positive){
+	            sample.allExamples[0].x.x_is[i].n_candidates = n_candidates;
+	            strcpy(sample.allExamples[0].x.x_is[i].file_name, file_name);
+	            sample.allExamples[0].x.x_is[i].boxes[j].min_x = min_x;
+	            sample.allExamples[0].x.x_is[i].boxes[j].min_y = min_y;
+	            sample.allExamples[0].x.x_is[i].boxes[j].width = width;
+	            sample.allExamples[0].x.x_is[i].boxes[j].height = height;
+	            sample.allExamples[0].x.x_is[i].bbox_labels[j] = bbox_label;
+		        sample.allExamples[0].x.x_is[i].id_map[j] = id_map;
+                sample.allExamples[0].x.x_is[i].phis[j] = read_sparse_vector(sample.allExamples[0].x.x_is[i].file_name, sample.allExamples[0].x.x_is[i].id_map[j], sparm);	        
+	        }
+        }
+	    
+	    fscanf(fp,"%d",&sample.allExamples[0].x.x_is[i].label);
+	    sample.allExamples[0].y.labels[i] = sample.allExamples[0].x.x_is[i].label;
+	    // Image label can be 0(negative image) or 1(positive image)
+	    if(sample.allExamples[0].x.x_is[i].label == 0) {
+	        sample.allExamples[0].n_neg++;
+	    } else if(sample.allExamples[0].x.x_is[i].supervised_positive){ 
+            sample.allExamples[0].n_pos += n_sup_pos;
+            for(j = 1; j < n_sup_pos; j++){
+                sample.allExamples[0].x.x_is[i+j].label = sample.allExamples[0].x.x_is[i].label;
+                sample.allExamples[0].y.labels[i+j] = sample.allExamples[0].x.x_is[i].label;
+            }
+	    }
+	    else{
+	        sample.allExamples[0].n_pos++;
+	    }
+	    
+	    if(n_sup_pos){
+            i += (n_sup_pos-1);
+        }
+    }
+    
+    
+     
+    sample.examples = (EXAMPLE *) malloc(sample.n*sizeof(EXAMPLE));
+    if(!sample.examples) die("Memory error.");
+
+    sample.examples[0].x.example_cost = 1;
+    sample.examples[0].n_neg = sample.allExamples[0].n_neg;
+    sample.examples[0].n_pos = sample.allExamples[0].n_pos;
+
+    sample.examples[0].x.x_is = (SUB_PATTERN *) malloc((sample.examples[0].n_neg+sample.examples[0].n_pos)*sizeof(SUB_PATTERN));
+    if(!sample.examples[0].x.x_is) die("Memory error.");
+    sample.examples[0].y.labels = (int *) malloc((sample.examples[0].n_neg+sample.examples[0].n_pos)*sizeof(int));
+    if(!sample.examples[0].y.labels) die("Memory error.");
+
+    int exampleCount = 0;
+    for(i = 0; i < sample.allExamples[0].n_imgs; i++){
+        if (sample.allExamples[0].x.x_is[i].label == 1){
+            sample.examples[0].x.x_is[exampleCount].n_candidates = sample.allExamples[0].x.x_is[i].n_candidates;
+            sample.examples[0].x.x_is[exampleCount].phis = sample.allExamples[0].x.x_is[i].phis;
+            sample.examples[0].x.x_is[exampleCount].label = 1;
+            sample.examples[0].y.labels[exampleCount] = 1;
+            exampleCount++;
+        }
+    }
+
+    for(i = 0; i < sample.allExamples[0].n_neg; i++){
+        sample.examples[0].x.x_is[exampleCount].n_candidates = 1;
+        sample.examples[0].x.x_is[exampleCount].phis = (SVECTOR **) malloc(sizeof(SVECTOR *));
+        sample.examples[0].x.x_is[exampleCount].label = 0;
+        sample.examples[0].y.labels[exampleCount] = 0;
+        exampleCount++;
+    }
+
+    sample.examples[0].x.n_neg_boxes = 0;
+    sample.examples[0].x.negExPool = NULL;
+    for(i = 0; i < sample.allExamples[0].n_imgs; i++){
+        if (sample.allExamples[0].x.x_is[i].label == 0){
+            for(j = 0; j < sample.allExamples[0].x.x_is[i].n_candidates; j++){
+                sample.examples[0].x.n_neg_boxes++;
+                sample.examples[0].x.negExPool = (SVECTOR **)realloc(sample.examples[0].x.negExPool, sample.examples[0].x.n_neg_boxes*sizeof(SVECTOR *));
+                if(!sample.examples[0].x.negExPool) die("Memory error.");
+                sample.examples[0].x.negExPool[sample.examples[0].x.n_neg_boxes-1] = sample.allExamples[0].x.x_is[i].phis[j];
+            }
+        }
+    }
+     
+    sample.examples[0].x.n_pos = sample.examples[0].n_pos;
+    sample.examples[0].x.n_neg = sample.examples[0].n_neg;
+    sample.examples[0].y.n_pos = sample.examples[0].n_pos;
+    sample.examples[0].y.n_neg = sample.examples[0].n_neg;
+    
+    /* Intialise label*/
+    sample.examples[0].y.ranking = (int *) calloc((sample.examples[0].n_pos+sample.examples[0].n_neg), sizeof(int));
+    for(i = 0; i < (sample.examples[0].n_pos+sample.examples[0].n_neg); i++){
+        for(j = i+1; j < (sample.examples[0].n_pos+sample.examples[0].n_neg); j++){
+            if(sample.examples[0].x.x_is[i].label == 1){
+                if(sample.examples[0].x.x_is[j].label == 0){
+                    sample.examples[0].y.ranking[i]++;
+                    sample.examples[0].y.ranking[j]--;
+                }              
+            }
+            else{
+                if(sample.examples[0].x.x_is[j].label == 1){
+                    sample.examples[0].y.ranking[i]--;
+                    sample.examples[0].y.ranking[j]++;
+                }
+            }
+        }
+    }
+
+    return(sample); 
+}
+
+SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
+    SAMPLE sample;
+    if(sparm->learning_type == 0){
+        sample = read_unpooled_examples(file, sparm);
+    }
+    else if(sparm->learning_type == 1){
+        sample = read_pooled_examples(file, sparm);        
+    }
+    return sample;
+}
+
+SAMPLE read_struct_test_examples(char *file, STRUCT_LEARN_PARM *sparm) {
+    SAMPLE sample;
+
+    sample = read_unpooled_examples(file, sparm);
+    return sample;
+}
+
+
 void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, LEARN_PARM *lparm, KERNEL_PARM *kparm) {
 /*
   Initialize parameters in STRUCTMODEL sm. Set the diminension 
@@ -265,7 +494,12 @@ void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, S
             sample->examples[0].h.h_is[i] = positive_candidate; 
         }
         else{
-            sample->examples[0].h.h_is[i] = -1; // There is no latent variable for negative samples.
+             if(sparm->learning_type == 0){
+                sample->examples[0].h.h_is[i] = -1; // There is no latent variable for negative samples.
+            }
+            else if(sparm->learning_type == 1){
+                sample->examples[0].h.h_is[i] = 0; // There is no latent variable for negative samples.     
+            }
         }                       
     }
 	
@@ -511,7 +745,7 @@ void findOptimumNegLocations(PATTERN x, LABEL *ybar, IMG_SCORE *positiveImgScore
     free(optimumLocNegImg);
 }
 
-void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LATENT_VAR *h, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void find_most_violated_constraint_marginrescaling(PATTERN *x, LABEL y, LATENT_VAR *h, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
   Finds the most violated constraint (loss-augmented inference), i.e.,
   computing argmax_{(ybar,hbar)} [<w,psi(x,ybar,hbar)> + loss(y,ybar,hbar)].
@@ -522,38 +756,52 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LATENT_VA
     
     double maxScore = -DBL_MAX;
     double score;
-
-    for(i = 0; i < (x.n_pos+x.n_neg); i++){
-        maxScore = -DBL_MAX;
-        if(x.x_is[i].label == 0){
-            for(j = 0; j < x.x_is[i].n_candidates; j++){
-                score = sprod_ns(sm->w, x.x_is[i].phis[j]);      
-                if(score > maxScore){
-                    maxScore = score;
-                    h->h_is[i] = j;
-                }   
+    
+    if(sparm->learning_type == 0){
+        for(i = 0; i < (x->n_pos+x->n_neg); i++){
+            maxScore = -DBL_MAX;
+            if(x->x_is[i].label == 0){
+                for(j = 0; j < x->x_is[i].n_candidates; j++){
+                    score = sprod_ns(sm->w, x->x_is[i].phis[j]);      
+                    if(score > maxScore){
+                        maxScore = score;
+                        h->h_is[i] = j;
+                    }   
+                }
             }
         }
     }
+    else if(sparm->learning_type == 1){
+        IMG_SCORE *negBBScores = malloc(x->n_neg_boxes*sizeof(IMG_SCORE));
+        if(!negBBScores) die("Memory error");
+        for(i = 0; i < x->n_neg_boxes; i++){
+            negBBScores[i].img_idx = i;
+            negBBScores[i].img_score = sprod_ns(sm->w, x->negExPool[i]);
+        }
+        qsort(negBBScores, x->n_neg_boxes, sizeof(IMG_SCORE), img_score_comp);
+        for(i = 0; i < (x->n_neg); i++){
+            x->x_is[x->n_pos+i].phis[0] = x->negExPool[negBBScores[i].img_idx]; 
+        }
+    }
 
-    hbar->h_is = malloc((x.n_pos+x.n_neg)*sizeof(int));
+    hbar->h_is = malloc((x->n_pos+x->n_neg)*sizeof(int));
     if(!hbar->h_is) die("Memory error");
-    for(i = 0; i < (x.n_pos+x.n_neg); i++){
+    for(i = 0; i < (x->n_pos+x->n_neg); i++){
         hbar->h_is[i] = h->h_is[i];
     }
     
-    IMG_SCORE *positiveImgScores = malloc(x.n_pos*sizeof(IMG_SCORE));
+    IMG_SCORE *positiveImgScores = malloc(x->n_pos*sizeof(IMG_SCORE));
     if(!positiveImgScores) die("Memory error");
-    IMG_SCORE *negativeImgScores = malloc(x.n_neg*sizeof(IMG_SCORE));    
+    IMG_SCORE *negativeImgScores = malloc(x->n_neg*sizeof(IMG_SCORE));    
     if(!negativeImgScores) die("Memory error");
-    int *imgIndexMap = malloc((x.n_pos+x.n_neg)*sizeof(*imgIndexMap));
+    int *imgIndexMap = malloc((x->n_pos+x->n_neg)*sizeof(*imgIndexMap));
     if(!imgIndexMap) die("Memory error");
     int negativeId = 0;
     int positiveId = 0;    
     // find scores of all positive images
-    for(i = 0; i < (x.n_pos + x.n_neg); i++){
-        score = sprod_ns(sm->w, x.x_is[i].phis[hbar->h_is[i]]);
-        if(x.x_is[i].label == 0){
+    for(i = 0; i < (x->n_pos + x->n_neg); i++){
+        score = sprod_ns(sm->w, x->x_is[i].phis[hbar->h_is[i]]);
+        if(x->x_is[i].label == 0){
             negativeImgScores[negativeId].img_idx = i;
             negativeImgScores[negativeId].img_score = score;
             negativeId++;
@@ -566,13 +814,13 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LATENT_VA
     }
     
     // sort positiveImgScores and negativeImgScores in descending order of score
-    qsort(negativeImgScores, x.n_neg, sizeof(IMG_SCORE), img_score_comp);
-    qsort(positiveImgScores, x.n_pos, sizeof(IMG_SCORE), img_score_comp);
+    qsort(negativeImgScores, x->n_neg, sizeof(IMG_SCORE), img_score_comp);
+    qsort(positiveImgScores, x->n_pos, sizeof(IMG_SCORE), img_score_comp);
     
     negativeId = 0;
     positiveId = 0; 
-    for(i = 0; i < (x.n_pos+x.n_neg); i++){
-        if(x.x_is[i].label == 1){
+    for(i = 0; i < (x->n_pos+x->n_neg); i++){
+        if(x->x_is[i].label == 1){
             imgIndexMap[positiveImgScores[positiveId].img_idx] = positiveId;
             positiveId++;
         }
@@ -582,10 +830,10 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LATENT_VA
         }
     }    
     
-    findOptimumNegLocations(x, ybar, positiveImgScores, negativeImgScores, imgIndexMap);
-    ybar->n_pos = x.n_pos;
-    ybar->n_neg = x.n_neg;
-    ybar->labels = malloc((x.n_pos+x.n_neg)*sizeof(int));
+    findOptimumNegLocations(*x, ybar, positiveImgScores, negativeImgScores, imgIndexMap);
+    ybar->n_pos = x->n_pos;
+    ybar->n_neg = x->n_neg;
+    ybar->labels = malloc((x->n_pos+x->n_neg)*sizeof(int));
     
     free(positiveImgScores);
     free(negativeImgScores);
@@ -816,12 +1064,14 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
   /* set default */
   sparm->feature_size = 2405;
   sparm->rng_seed = 0;
+  sparm->learning_type = 0; // default learning type set to 0, corresponding to unpooled negatives
   
   for (i=0;(i<sparm->custom_argc)&&((sparm->custom_argv[i])[0]=='-');i++) {
     switch ((sparm->custom_argv[i])[2]) {
       /* your code here */
       case 'f': i++; sparm->feature_size = atoi(sparm->custom_argv[i]); break;
       case 'r': i++; sparm->rng_seed = atoi(sparm->custom_argv[i]); break;
+      case 't': i++; sparm->learning_type = atoi(sparm->custom_argv[i]); break;
       default: printf("\nUnrecognized option %s!\n\n", sparm->custom_argv[i]); exit(0);
     }
   }

@@ -111,7 +111,7 @@ double current_obj_val(EXAMPLE *ex, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
 		if(!valid_examples[i])
 			continue;
 	
-    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint_marginrescaling(&ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
 	
     /* get difference vector */
     //fy = copy_svector(fycache[i]);
@@ -201,7 +201,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, double *margin, long m, STRUCTMODEL *sm
 		}
 
     
-    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint_marginrescaling(&ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
 
     /* get difference vector */
     //fy = copy_svector(fycache[i]);
@@ -488,7 +488,7 @@ int update_valid_examples(double *w, long m, double C, EXAMPLE *ex, STRUCTMODEL 
 		penalty = DBL_MAX;
 
 	for (i=0;i<m;i++) {
-		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
+		find_most_violated_constraint_marginrescaling(&ex[i].x, ex[i].y, &ex[i].h, &ybar, &hbar, sm, sparm);
 		//fy = copy_svector(fycache[i]);
 		fy = psi(ex[i].x, ex[i].y, ex[i].h, sm, sparm);
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);

@@ -53,6 +53,8 @@ typedef struct pattern {
     SUB_PATTERN *x_is;
     long n_pos;
     long n_neg;
+    long n_neg_boxes;
+     SVECTOR **negExPool;
 } PATTERN;
 
 typedef struct label {
@@ -92,6 +94,7 @@ typedef struct example {
 typedef struct sample {
   int n;
   EXAMPLE *examples;
+  EXAMPLE *allExamples;
 } SAMPLE;
 
 
@@ -128,6 +131,7 @@ typedef struct struct_learn_parm {
   long feature_size;
   int rng_seed;
   int isInitByBinSVM;
+  int learning_type;
   
 } STRUCT_LEARN_PARM;
 
