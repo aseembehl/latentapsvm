@@ -108,16 +108,19 @@ SAMPLE read_unpooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
     // Initialise pattern 
     sample.examples[0].x.example_cost = 1;
     
+    int is_fs = 0;
 	int n_candidates;
 	char file_name[1000];
 	int n_example = 0;
 	int label;
     
-    for(i = 0; i < sample.examples[0].n_imgs; i++){      
+    for(i = 0; i < sample.examples[0].n_imgs; i++){  
+        fscanf(fp, "%d", &is_fs);
+        fscanf(fp, "%d", &label);    
         fscanf(fp, "%s", file_name);
         fscanf(fp, "%d", &n_candidates);
         
-        if(n_candidates == 20){
+        if(!is_fs){
             n_example++;
             sample.examples[0].x.x_is = (SUB_PATTERN *) realloc(sample.examples[0].x.x_is, n_example*sizeof(SUB_PATTERN));
             if(!sample.examples[0].x.x_is) die("Memory error.");
@@ -221,167 +224,6 @@ SAMPLE read_unpooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 
     return(sample); 
 }
-
-
-/*SAMPLE read_unpooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
-
-  //Read input examples {(x_1,y_1),...,(x_n,y_n)} from file.
-  //The type of pattern x and label y has to follow the definition in 
-  //svm_struct_latent_api_types.h. Latent variables h can be either
-  //initialized in this function or by calling init_latent_variables(). 
-
-  SAMPLE sample;
-  
-  // your code here 
-    int i , j; 
-    
-    // open the file containing candidate bounding box dimensions/labels/featurePath and image label
-    FILE *fp = fopen(file, "r");
-    if(fp==NULL){
-        printf("Error: Cannot open input file %s\n",file);
-        exit(1);      
-    }
-
-    // We treat all images as one example, since there is only one correct structural output Y* for all images combined
-    sample.n = 1;  
-    sample.examples = (EXAMPLE *) malloc(sample.n*sizeof(EXAMPLE));
-    if(!sample.examples) die("Memory error.");
-    sample.examples[0].n_pos = 0;
-    sample.examples[0].n_neg = 0;
-    
-    fscanf(fp,"%ld", &sample.examples[0].n_imgs);
-    
-    // Initialise pattern 
-    sample.examples[0].x.example_cost = 1;
-    sample.examples[0].x.x_is = (SUB_PATTERN *) malloc(sample.examples[0].n_imgs*sizeof(SUB_PATTERN));
-    if(!sample.examples[0].x.x_is) die("Memory error.");
-    sample.examples[0].y.labels = (int *) malloc(sample.examples[0].n_imgs*sizeof(int));
-    if(!sample.examples[0].y.labels) die("Memory error.");
-    
-    int min_x;
-	int min_y;
-	int width;
-	int height;
-	int id_map;
-	int n_candidates;
-	char file_name[1000];
-	int bbox_label;
-	int n_sup_pos;
-    
-    for(i = 0; i < sample.examples[0].n_imgs; i++){      
-        sample.examples[0].x.x_is[i].supervised_positive = 0;
-        n_sup_pos = 0;
-      
-        fscanf(fp, "%s", file_name);
-        fscanf(fp, "%d", &n_candidates);
-        
-        sample.examples[0].x.x_is[i].boxes = (BBOX *) malloc(n_candidates*sizeof(BBOX));
-        if(!sample.examples[0].x.x_is[i].boxes) die("Memory error.");
-	    sample.examples[0].x.x_is[i].id_map = (int *) malloc(n_candidates*sizeof(int));
-        if(!sample.examples[0].x.x_is[i].id_map) die("Memory error.");
-        sample.examples[0].x.x_is[i].bbox_labels = (int *) malloc (n_candidates*sizeof(int));
-        if(!sample.examples[0].x.x_is[i].bbox_labels) die("Memory error.");
-        sample.examples[0].x.x_is[i].phis = (SVECTOR **) malloc(n_candidates*sizeof(SVECTOR *));
-        if(!sample.examples[0].x.x_is[i].phis) die("Memory error.");
-        
-        for(j = 0; j < n_candidates; j++){
-	        fscanf(fp, "%d", &min_x);
-            fscanf(fp, "%d", &min_y);
-            fscanf(fp, "%d", &width);
-	        fscanf(fp, "%d", &height);
-	        fscanf(fp, "%d", &id_map);
-	        // bbox label can be -1 or 0. For negative images all bbbox labels are 0(meaning negative). 
-	        // For positive images all bbox labels are -1(meaning unknown). 
-	        fscanf(fp, "%d", &bbox_label);
-	        if(bbox_label == 1){	            
-	            if(n_sup_pos >= 1){
-	                // realloc size of sample.examples[0].x.x_is and sample.examples[0].y.labels by +n_sup_pos 
-	                sample.examples[0].n_imgs++;
-	                sample.examples[0].x.x_is = (SUB_PATTERN *) realloc(sample.examples[0].x.x_is, sample.examples[0].n_imgs*sizeof(SUB_PATTERN));
-                    if(!sample.examples[0].x.x_is) die("Memory error.");
-                    sample.examples[0].y.labels = (int *) realloc(sample.examples[0].y.labels, sample.examples[0].n_imgs*sizeof(int));
-                    if(!sample.examples[0].y.labels) die("Memory error.");
-	            }	
-	            sample.examples[0].x.x_is[i+n_sup_pos].n_candidates = 1;
-	            strcpy(sample.examples[0].x.x_is[i+n_sup_pos].file_name, file_name);
-
-	            sample.examples[0].x.x_is[i+n_sup_pos].boxes = (BBOX *) realloc(sample.examples[0].x.x_is[i+n_sup_pos].boxes, sizeof(BBOX));  
-	            sample.examples[0].x.x_is[i+n_sup_pos].boxes[0].min_x = min_x;
-	            sample.examples[0].x.x_is[i+n_sup_pos].boxes[0].min_y = min_y;
-	            sample.examples[0].x.x_is[i+n_sup_pos].boxes[0].height = height;
-	            sample.examples[0].x.x_is[i+n_sup_pos].boxes[0].width = width;
-	            
-	            sample.examples[0].x.x_is[i+n_sup_pos].id_map = (int *) realloc(sample.examples[0].x.x_is[i+n_sup_pos].id_map, sizeof(int));
-	            sample.examples[0].x.x_is[i+n_sup_pos].id_map[0] = id_map;
-
-	            sample.examples[0].x.x_is[i+n_sup_pos].bbox_labels = (int *) realloc (sample.examples[0].x.x_is[i+n_sup_pos].bbox_labels, sizeof(int));
-	            sample.examples[0].x.x_is[i+n_sup_pos].bbox_labels[0] = bbox_label;   	                  
-	            
-	            sample.examples[0].x.x_is[i+n_sup_pos].phis = (SVECTOR **) realloc(sample.examples[0].x.x_is[i+n_sup_pos].phis, sizeof(SVECTOR *));
-	            sample.examples[0].x.x_is[i+n_sup_pos].phis[0] = read_sparse_vector(sample.examples[0].x.x_is[i].file_name, sample.examples[0].x.x_is[i+n_sup_pos].id_map[0], sparm);
-	            n_sup_pos++;
-	            sample.examples[0].x.x_is[i].supervised_positive = 1;
-	            continue;            
-	        }
-	        if(!sample.examples[0].x.x_is[i].supervised_positive){
-	            sample.examples[0].x.x_is[i].n_candidates = n_candidates;
-	            strcpy(sample.examples[0].x.x_is[i].file_name, file_name);
-	            sample.examples[0].x.x_is[i].boxes[j].min_x = min_x;
-	            sample.examples[0].x.x_is[i].boxes[j].min_y = min_y;
-	            sample.examples[0].x.x_is[i].boxes[j].width = width;
-	            sample.examples[0].x.x_is[i].boxes[j].height = height;
-	            sample.examples[0].x.x_is[i].bbox_labels[j] = bbox_label;
-		        sample.examples[0].x.x_is[i].id_map[j] = id_map;
-                sample.examples[0].x.x_is[i].phis[j] = read_sparse_vector(sample.examples[0].x.x_is[i].file_name, sample.examples[0].x.x_is[i].id_map[j], sparm);	        
-	        }
-        }
-	    
-	    fscanf(fp,"%d",&sample.examples[0].x.x_is[i].label);
-	    sample.examples[0].y.labels[i] = sample.examples[0].x.x_is[i].label;
-	    // Image label can be 0(negative image) or 1(positive image)
-	    if(sample.examples[0].x.x_is[i].label == 0) {
-	        sample.examples[0].n_neg++;
-	    } else if(sample.examples[0].x.x_is[i].supervised_positive){ 
-            sample.examples[0].n_pos += n_sup_pos;
-            for(j = 1; j < n_sup_pos; j++){
-                sample.examples[0].x.x_is[i+j].label = sample.examples[0].x.x_is[i].label;
-                sample.examples[0].y.labels[i+j] = sample.examples[0].x.x_is[i].label;
-            }
-	    }
-	    else{
-	        sample.examples[0].n_pos++;
-	    }
-	    
-	    if(n_sup_pos){
-            i += (n_sup_pos-1);
-        }
-    }
-     
-    sample.examples[0].x.n_pos = sample.examples[0].n_pos;
-    sample.examples[0].x.n_neg = sample.examples[0].n_neg;
-    sample.examples[0].y.n_pos = sample.examples[0].n_pos;
-    sample.examples[0].y.n_neg = sample.examples[0].n_neg;
-    
-    sample.examples[0].y.ranking = (int *) calloc((sample.examples[0].n_pos+sample.examples[0].n_neg), sizeof(int));
-    for(i = 0; i < (sample.examples[0].n_pos+sample.examples[0].n_neg); i++){
-        for(j = i+1; j < (sample.examples[0].n_pos+sample.examples[0].n_neg); j++){
-            if(sample.examples[0].x.x_is[i].label == 1){
-                if(sample.examples[0].x.x_is[j].label == 0){
-                    sample.examples[0].y.ranking[i]++;
-                    sample.examples[0].y.ranking[j]--;
-                }              
-            }
-            else{
-                if(sample.examples[0].x.x_is[j].label == 1){
-                    sample.examples[0].y.ranking[i]--;
-                    sample.examples[0].y.ranking[j]++;
-                }
-            }
-        }
-    }
-
-    return(sample); 
-}*/
 
 SAMPLE read_pooled_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 /*
