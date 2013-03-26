@@ -54,6 +54,7 @@ typedef struct pattern {
     long n_pos;
     long n_neg;
     long n_neg_boxes;
+     long n_unsup_neg;
      SVECTOR **negExPool;
 } PATTERN;
 
@@ -89,12 +90,13 @@ typedef struct example {
   long n_imgs; 
   long n_pos;
   long n_neg;
+
 } EXAMPLE;
 
 typedef struct sample {
   int n;
   EXAMPLE *examples;
-  EXAMPLE *allExamples;
+
 } SAMPLE;
 
 
